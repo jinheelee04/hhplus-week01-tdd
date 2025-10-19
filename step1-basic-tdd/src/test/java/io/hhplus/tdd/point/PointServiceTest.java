@@ -5,8 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 class PointServiceTest {
 
@@ -50,4 +49,27 @@ class PointServiceTest {
         assertEquals(expectedPoint, result.point());
     }
 
+    @Test
+    @DisplayName("음수 ID로 포인트를 조회하면 예외가 발생한다")
+    void getPoint_withNegativeUserId_throwsException() {
+        // given
+        long invalidUserId = -1L;
+
+        // when & then
+        assertThrows(IllegalArgumentException.class, () -> {
+            pointService.getPoint(invalidUserId);
+        });
+    }
+
+    @Test
+    @DisplayName("0 ID로 포인트를 조회하면 예외가 발생한다")
+    void getPoint_withZeroUserId_throwsException() {
+        // given
+        long invalidUserId = 0L;
+
+        // when & then
+        assertThrows(IllegalArgumentException.class, () -> {
+            pointService.getPoint(invalidUserId);
+        });
+    }
 }
