@@ -12,6 +12,9 @@ public class PointServiceImpl implements PointService {
 
     @Override
     public UserPoint getPoint(Long userId) {
+        if(userId <= 0){
+            throw new IllegalArgumentException();
+        }
         return userPointTable.selectById(userId);
     }
 }
