@@ -88,4 +88,24 @@ class PointServiceTest {
         assertEquals(userId, result.id());
         assertEquals(chargeAmount, result.point());
     }
+
+    @Test
+    @DisplayName("이미 포인트가 있는 유저가 추가 충전하면 기존 포인트에 누적된다")
+    void charge_whenExistingUser_accumulatesPoint() {
+        // given
+        long userId = 2L;
+        long initialAmount = 1000L;
+        long chargeAmount = 500L;
+
+        // 초기 포인트 설정
+        userPointTable.insertOrUpdate(userId, initialAmount);
+
+        // when
+        UserPoint result = pointService.charge(userId, chargeAmount);
+
+        // then
+        assertNotNull(result);
+        assertEquals(userId, result.id());
+        assertEquals(initialAmount + chargeAmount, result.point());
+    }
 }
