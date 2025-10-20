@@ -17,4 +17,9 @@ public class PointServiceImpl implements PointService {
         }
         return userPointTable.selectById(userId);
     }
+
+    @Override
+    public UserPoint charge(long userId, long chargeAmount) {
+        return userPointTable.insertOrUpdate(userId, chargeAmount);
+    }
 }
