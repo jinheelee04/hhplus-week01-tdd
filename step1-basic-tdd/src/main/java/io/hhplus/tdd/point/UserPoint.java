@@ -9,4 +9,9 @@ public record UserPoint(
     public static UserPoint empty(long id) {
         return new UserPoint(id, 0, System.currentTimeMillis());
     }
+
+    public UserPoint addPoints(long amount) {
+        long newAmount = this.point + amount;
+        return new UserPoint(this.id, newAmount, System.currentTimeMillis());
+    }
 }
