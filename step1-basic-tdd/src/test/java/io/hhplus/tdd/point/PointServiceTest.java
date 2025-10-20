@@ -72,4 +72,20 @@ class PointServiceTest {
             pointService.getPoint(invalidUserId);
         });
     }
+
+    @Test
+    @DisplayName("유효한 사용자 ID와 충전 금액으로 포인트를 충전하면 충전된 포인트가 반환된다")
+    void charge_withValidUserIdAndAmount_returnsChargedPoint() {
+        // given
+        long userId = 1L;
+        long chargeAmount = 1000L;
+
+        // when
+        UserPoint result = pointService.charge(userId, chargeAmount);
+
+        // then
+        assertNotNull(result);
+        assertEquals(userId, result.id());
+        assertEquals(chargeAmount, result.point());
+    }
 }
