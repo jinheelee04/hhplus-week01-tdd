@@ -122,4 +122,17 @@ class PointServiceTest {
         });
     }
 
+    @Test
+    @DisplayName("음수 금액으로 충전하면 예외가 발생한다")
+    void charge_withNegativeAmount_throwsException() {
+        // given
+        long userId = 1L;
+        long invalidAmount = -1L;
+
+        // when & then
+        assertThrows(IllegalArgumentException.class, () -> {
+            pointService.charge(userId, invalidAmount);
+        });
+    }
+
 }
