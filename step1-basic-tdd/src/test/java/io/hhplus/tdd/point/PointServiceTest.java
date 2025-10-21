@@ -108,4 +108,18 @@ class PointServiceTest {
         assertEquals(userId, result.id());
         assertEquals(initialAmount + chargeAmount, result.point());
     }
+
+    @Test
+    @DisplayName("0 이하의 금액으로 충전하면 예외가 발생한다")
+    void charge_withZeroOrNegativeAmount_throwsException() {
+        // given
+        long userId = 1L;
+        long invalidAmount = 0L;
+
+        // when & then
+        assertThrows(IllegalArgumentException.class, () -> {
+            pointService.charge(userId, invalidAmount);
+        });
+    }
+
 }
