@@ -21,7 +21,7 @@ public class PointServiceImpl implements PointService {
     @Override
     public UserPoint charge(long userId, long chargeAmount) {
         if (chargeAmount <= 0) {
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("충전 금액은 0보다 커야 합니다");
         }
         UserPoint current = getPoint(userId);
         UserPoint updated = current.addPoints(chargeAmount);
