@@ -135,4 +135,21 @@ class PointServiceTest {
         });
     }
 
+    @Test
+    @DisplayName("충전 후 최대 잔액(100,000)을 초과하면 예외가 발생한다")
+    void charge_exceedingMaxBalance_throwsException() {
+        // given
+        long userId = 1L;
+        long currentBalance = 95_000L;
+        long chargeAmount = 10_000L;
+
+        userPointTable.insertOrUpdate(userId, currentBalance);
+
+        // when & then
+        assertThrows(IllegalStateException.class, () -> {
+            pointService.charge(userId, chargeAmount);
+        });
+
+    }
+
 }
