@@ -20,6 +20,9 @@ public class PointServiceImpl implements PointService {
 
     @Override
     public UserPoint charge(long userId, long chargeAmount) {
+        if (chargeAmount <= 0) {
+            throw new IllegalArgumentException();
+        }
         UserPoint current = getPoint(userId);
         UserPoint updated = current.addPoints(chargeAmount);
         return userPointTable.insertOrUpdate(updated.id(), updated.point());
