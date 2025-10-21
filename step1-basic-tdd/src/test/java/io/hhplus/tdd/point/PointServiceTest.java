@@ -164,4 +164,20 @@ class PointServiceTest {
             pointService.charge(userId, belowMinimumAmount);
         });
     }
+
+    @Test
+    @DisplayName("최소 충전 금액(100원)으로 충전하면 성공한다")
+    void charge_withMinimumAmount_success() {
+        // given
+        long userId = 1L;
+        long minimumAmount = 100L;
+
+        // when
+        UserPoint result = pointService.charge(userId, minimumAmount);
+
+        // then
+        assertNotNull(result);
+        assertEquals(userId, result.id());
+        assertEquals(minimumAmount, result.point());
+    }
 }
