@@ -31,4 +31,17 @@ public record UserPoint(
         return new UserPoint(this.id, newAmount, System.currentTimeMillis());
     }
 
+    public UserPoint deductPoints(long amount) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("사용 금액은 1원 이상이어야 합니다.");
+        }
+
+        if (this.point < amount) {
+            throw new IllegalStateException("포인트 잔액이 부족합니다. (현재 잔액: " + this.point + "원, 사용 시도: " + amount + "원)");
+        }
+
+        long newAmount = this.point - amount;
+        return new UserPoint(this.id, newAmount, System.currentTimeMillis());
+    }
+
 }

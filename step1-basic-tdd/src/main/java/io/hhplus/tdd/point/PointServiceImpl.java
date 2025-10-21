@@ -27,4 +27,11 @@ public class PointServiceImpl implements PointService {
         UserPoint updated = current.addPoints(chargeAmount);
         return userPointTable.insertOrUpdate(updated.id(), updated.point());
     }
+
+    @Override
+    public UserPoint use(long userId, long useAmount) {
+        UserPoint current = getPoint(userId);
+        UserPoint updated = current.deductPoints(useAmount);
+        return userPointTable.insertOrUpdate(updated.id(), updated.point());
+    }
 }

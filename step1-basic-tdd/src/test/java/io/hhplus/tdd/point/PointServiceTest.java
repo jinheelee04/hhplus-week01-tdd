@@ -193,4 +193,105 @@ class PointServiceTest {
             pointService.charge(userId, exceedingAmount);
         });
     }
+
+    @Test
+    @DisplayName("보유한 포인트 내에서 포인트를 사용하면 차감된 포인트가 반환된다")
+    void use_withSufficientBalance_returnsDeductedPoint() {
+        // given
+        long userId = 1L;
+        long initialPoint = 10_000L;
+        long useAmount = 3_000L;
+
+        userPointTable.insertOrUpdate(userId, initialPoint);
+
+        // when
+        UserPoint result = pointService.use(userId, useAmount);
+
+        // then
+        assertNotNull(result);
+        assertEquals(userId, result.id());
+        assertEquals(initialPoint - useAmount, result.point());
+    }
+
+    @Test
+    @DisplayName("보유 포인트보다 많은 금액을 사용하면 예외가 발생한다")
+    void use_withInsufficientBalance_throwsException() {
+        // given
+        long userId = 1L;
+        long currentBalance = 5_000L;
+        long useAmount = 10_000L;
+
+        userPointTable.insertOrUpdate(userId, currentBalance);
+
+        // when & then
+        assertThrows(IllegalStateException.class, () -> {
+            pointService.use(userId, useAmount);
+        });
+    }
+
+    @Test
+    @DisplayName("0원을 사용하면 예외가 발생한다")
+    void use_withZeroAmount_throwsException() {
+        // given
+        long userId = 1L;
+        long currentBalance = 10_000L;
+        long useAmount = 0L;
+
+        userPointTable.insertOrUpdate(userId, currentBalance);
+
+        // when & then
+        assertThrows(IllegalArgumentException.class, () -> {
+            pointService.use(userId, useAmount);
+        });
+    }
+
+    @Test
+    @DisplayName("음수 금액을 사용하면 예외가 발생한다")
+    void use_withNegativeAmount_throwsException() {
+        // given
+        long userId = 1L;
+        long currentBalance = 10_000L;
+        long useAmount = -1_000L;
+
+        userPointTable.insertOrUpdate(userId, currentBalance);
+
+        // when & then
+        assertThrows(IllegalArgumentException.class, () -> {
+            pointService.use(userId, useAmount);
+        });
+    }
+
+    @Test
+    @DisplayName("보유 포인트 전액을 사용하면 잔액이 0이 된다")
+    void use_withExactBalance_returnsZeroPoint() {
+        // given
+        long userId = 1L;
+        long currentBalance = 10_000L;
+        long useAmount = 10_000L;
+
+        userPointTable.insertOrUpdate(userId, currentBalance);
+
+        // when
+        UserPoint result = pointService.use(userId, useAmount);
+
+        // then
+        assertNotNull(result);
+        assertEquals(userId, result.id());
+        assertEquals(0L, result.point());
+    }
+
+    @Test
+    @DisplayName("잔액이 0인 상태에서 포인트를 사용하면 예외가 발생한다")
+    void use_withZeroBalance_throwsException() {
+        // given
+        long userId = 1L;
+        long useAmount = 1_000L;
+
+        // 잔액 0 (초기 상태)
+
+        // when & then
+        assertThrows(IllegalStateException.class, () -> {
+            pointService.use(userId, useAmount);
+        });
+    }
 }
