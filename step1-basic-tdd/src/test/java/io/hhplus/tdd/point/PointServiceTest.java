@@ -180,4 +180,17 @@ class PointServiceTest {
         assertEquals(userId, result.id());
         assertEquals(minimumAmount, result.point());
     }
+
+    @Test
+    @DisplayName("1회 최대 충전 금액(50,000원)을 초과하면 예외가 발생한다")
+    void charge_exceedingMaxChargeAmount_throwsException() {
+        // given
+        long userId = 1L;
+        long exceedingAmount = 50_001L;
+
+        // when & then
+        assertThrows(IllegalArgumentException.class, () -> {
+            pointService.charge(userId, exceedingAmount);
+        });
+    }
 }
