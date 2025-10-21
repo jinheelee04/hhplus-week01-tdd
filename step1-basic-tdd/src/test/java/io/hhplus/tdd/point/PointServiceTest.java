@@ -152,4 +152,16 @@ class PointServiceTest {
 
     }
 
+    @Test
+    @DisplayName("최소 충전 금액(100원) 미만으로 충전하면 예외가 발생한다")
+    void charge_belowMinimumAmount_throwsException() {
+        // given
+        long userId = 1L;
+        long belowMinimumAmount = 99L;
+
+        // when & then
+        assertThrows(IllegalArgumentException.class, () -> {
+            pointService.charge(userId, belowMinimumAmount);
+        });
+    }
 }
