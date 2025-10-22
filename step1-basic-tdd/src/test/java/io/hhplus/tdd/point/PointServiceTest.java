@@ -19,6 +19,8 @@ import static org.mockito.Mockito.*;
 class PointServiceTest {
 
     private PointService pointService;
+
+    @Mock
     private UserPointTable userPointTable;
 
     @Mock
@@ -26,7 +28,6 @@ class PointServiceTest {
 
     @BeforeEach
     void setUp() {
-         userPointTable = new UserPointTable();
          pointService = new PointServiceImpl(userPointTable, pointHistoryTable);
     }
     @Test
@@ -34,6 +35,8 @@ class PointServiceTest {
     void getPoint_whenUserNotExists_returnsZeroPoint() {
         // given
         long userId = 1L;
+        UserPoint emptyPoint = UserPoint.empty(userId);
+        when(userPointTable.selectById(userId)).thenReturn(emptyPoint);
 
         // when
         UserPoint result = pointService.getPoint(userId);
@@ -42,6 +45,7 @@ class PointServiceTest {
         assertNotNull(result);
         assertEquals(userId, result.id());
         assertEquals(0L, result.point());
+        verify(userPointTable, times(1)).selectById(userId);
     }
 
     @Test
@@ -50,7 +54,8 @@ class PointServiceTest {
         // given
         long userId = 1L;
         long expectedPoint = 1000L;
-        userPointTable.insertOrUpdate(userId, expectedPoint);
+        UserPoint existingPoint = new UserPoint(userId, expectedPoint, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(existingPoint);
 
         // when
         UserPoint result = pointService.getPoint(userId);
@@ -59,6 +64,7 @@ class PointServiceTest {
         assertNotNull(result);
         assertEquals(userId, result.id());
         assertEquals(expectedPoint, result.point());
+        verify(userPointTable, times(1)).selectById(userId);
     }
 
     @Test
@@ -92,6 +98,14 @@ class PointServiceTest {
         long userId = 1L;
         long chargeAmount = 1000L;
 
+        // Mock: 초기 포인트 조회 (0원)
+        UserPoint currentPoint = UserPoint.empty(userId);
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 충전 후 반환값
+        UserPoint chargedPoint = new UserPoint(userId, chargeAmount, System.currentTimeMillis());
+        when(userPointTable.insertOrUpdate(userId, chargeAmount)).thenReturn(chargedPoint);
+
         // when
         UserPoint result = pointService.charge(userId, chargeAmount);
 
@@ -99,6 +113,8 @@ class PointServiceTest {
         assertNotNull(result);
         assertEquals(userId, result.id());
         assertEquals(chargeAmount, result.point());
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, times(1)).insertOrUpdate(userId, chargeAmount);
     }
 
     @Test
@@ -108,9 +124,15 @@ class PointServiceTest {
         long userId = 2L;
         long initialAmount = 1000L;
         long chargeAmount = 500L;
+        long expectedTotal = initialAmount + chargeAmount;
 
-        // 초기 포인트 설정
-        userPointTable.insertOrUpdate(userId, initialAmount);
+        // Mock: 초기 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, initialAmount, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 충전 후 반환값
+        UserPoint chargedPoint = new UserPoint(userId, expectedTotal, System.currentTimeMillis());
+        when(userPointTable.insertOrUpdate(userId, expectedTotal)).thenReturn(chargedPoint);
 
         // when
         UserPoint result = pointService.charge(userId, chargeAmount);
@@ -118,7 +140,9 @@ class PointServiceTest {
         // then
         assertNotNull(result);
         assertEquals(userId, result.id());
-        assertEquals(initialAmount + chargeAmount, result.point());
+        assertEquals(expectedTotal, result.point());
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, times(1)).insertOrUpdate(userId, expectedTotal);
     }
 
     @Test
@@ -155,13 +179,17 @@ class PointServiceTest {
         long currentBalance = 95_000L;
         long chargeAmount = 10_000L;
 
-        userPointTable.insertOrUpdate(userId, currentBalance);
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
 
         // when & then
         assertThrows(IllegalStateException.class, () -> {
             pointService.charge(userId, chargeAmount);
         });
 
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
     }
 
     @Test
@@ -171,10 +199,17 @@ class PointServiceTest {
         long userId = 1L;
         long belowMinimumAmount = 99L;
 
+        // Mock: 현재 포인트 조회 (validation 전에 필요)
+        UserPoint currentPoint = UserPoint.empty(userId);
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
         // when & then
         assertThrows(IllegalArgumentException.class, () -> {
             pointService.charge(userId, belowMinimumAmount);
         });
+
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
     }
 
     @Test
@@ -184,6 +219,14 @@ class PointServiceTest {
         long userId = 1L;
         long minimumAmount = 100L;
 
+        // Mock: 초기 포인트 조회
+        UserPoint currentPoint = UserPoint.empty(userId);
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 충전 후 반환값
+        UserPoint chargedPoint = new UserPoint(userId, minimumAmount, System.currentTimeMillis());
+        when(userPointTable.insertOrUpdate(userId, minimumAmount)).thenReturn(chargedPoint);
+
         // when
         UserPoint result = pointService.charge(userId, minimumAmount);
 
@@ -191,6 +234,8 @@ class PointServiceTest {
         assertNotNull(result);
         assertEquals(userId, result.id());
         assertEquals(minimumAmount, result.point());
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, times(1)).insertOrUpdate(userId, minimumAmount);
     }
 
     @Test
@@ -200,10 +245,17 @@ class PointServiceTest {
         long userId = 1L;
         long exceedingAmount = 50_001L;
 
+        // Mock: 현재 포인트 조회 (validation 전에 필요)
+        UserPoint currentPoint = UserPoint.empty(userId);
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
         // when & then
         assertThrows(IllegalArgumentException.class, () -> {
             pointService.charge(userId, exceedingAmount);
         });
+
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
     }
 
     @Test
@@ -213,8 +265,15 @@ class PointServiceTest {
         long userId = 1L;
         long initialPoint = 10_000L;
         long useAmount = 3_000L;
+        long expectedBalance = initialPoint - useAmount;
 
-        userPointTable.insertOrUpdate(userId, initialPoint);
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, initialPoint, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 사용 후 반환값
+        UserPoint usedPoint = new UserPoint(userId, expectedBalance, System.currentTimeMillis());
+        when(userPointTable.insertOrUpdate(userId, expectedBalance)).thenReturn(usedPoint);
 
         // when
         UserPoint result = pointService.use(userId, useAmount);
@@ -222,7 +281,9 @@ class PointServiceTest {
         // then
         assertNotNull(result);
         assertEquals(userId, result.id());
-        assertEquals(initialPoint - useAmount, result.point());
+        assertEquals(expectedBalance, result.point());
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, times(1)).insertOrUpdate(userId, expectedBalance);
     }
 
     @Test
@@ -233,12 +294,17 @@ class PointServiceTest {
         long currentBalance = 5_000L;
         long useAmount = 10_000L;
 
-        userPointTable.insertOrUpdate(userId, currentBalance);
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
 
         // when & then
         assertThrows(IllegalStateException.class, () -> {
             pointService.use(userId, useAmount);
         });
+
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
     }
 
     @Test
@@ -249,12 +315,17 @@ class PointServiceTest {
         long currentBalance = 10_000L;
         long useAmount = 0L;
 
-        userPointTable.insertOrUpdate(userId, currentBalance);
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
 
         // when & then
         assertThrows(IllegalArgumentException.class, () -> {
             pointService.use(userId, useAmount);
         });
+
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
     }
 
     @Test
@@ -265,12 +336,17 @@ class PointServiceTest {
         long currentBalance = 10_000L;
         long useAmount = -1_000L;
 
-        userPointTable.insertOrUpdate(userId, currentBalance);
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
 
         // when & then
         assertThrows(IllegalArgumentException.class, () -> {
             pointService.use(userId, useAmount);
         });
+
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
     }
 
     @Test
@@ -281,7 +357,13 @@ class PointServiceTest {
         long currentBalance = 10_000L;
         long useAmount = 10_000L;
 
-        userPointTable.insertOrUpdate(userId, currentBalance);
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 사용 후 반환값
+        UserPoint usedPoint = new UserPoint(userId, 0L, System.currentTimeMillis());
+        when(userPointTable.insertOrUpdate(userId, 0L)).thenReturn(usedPoint);
 
         // when
         UserPoint result = pointService.use(userId, useAmount);
@@ -290,6 +372,8 @@ class PointServiceTest {
         assertNotNull(result);
         assertEquals(userId, result.id());
         assertEquals(0L, result.point());
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, times(1)).insertOrUpdate(userId, 0L);
     }
 
     @Test
@@ -299,12 +383,17 @@ class PointServiceTest {
         long userId = 1L;
         long useAmount = 1_000L;
 
-        // 잔액 0 (초기 상태)
+        // Mock: 잔액 0인 포인트 조회
+        UserPoint currentPoint = UserPoint.empty(userId);
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
 
         // when & then
         assertThrows(IllegalStateException.class, () -> {
             pointService.use(userId, useAmount);
         });
+
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
     }
 
     @Test
@@ -331,6 +420,15 @@ class PointServiceTest {
         long userId = 1L;
         long chargeAmount = 1000L;
 
+        // Mock: 초기 포인트 조회
+        UserPoint currentPoint = UserPoint.empty(userId);
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 충전 후 반환값
+        UserPoint chargedPoint = new UserPoint(userId, chargeAmount, System.currentTimeMillis());
+        when(userPointTable.insertOrUpdate(userId, chargeAmount)).thenReturn(chargedPoint);
+
+        // Mock: 히스토리 기록
         PointHistory expectedHistory = new PointHistory(1L, userId, chargeAmount, TransactionType.CHARGE, System.currentTimeMillis());
         when(pointHistoryTable.insert(eq(userId), eq(chargeAmount), eq(TransactionType.CHARGE), anyLong()))
                 .thenReturn(expectedHistory);
@@ -350,9 +448,17 @@ class PointServiceTest {
         long userId = 1L;
         long initialAmount = 5000L;
         long useAmount = 2000L;
+        long expectedBalance = initialAmount - useAmount;
 
-        userPointTable.insertOrUpdate(userId, initialAmount);
+        // Mock: 초기 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, initialAmount, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
 
+        // Mock: 포인트 업데이트 후 반환
+        UserPoint updatedPoint = new UserPoint(userId, expectedBalance, System.currentTimeMillis());
+        when(userPointTable.insertOrUpdate(userId, expectedBalance)).thenReturn(updatedPoint);
+
+        // Mock: 히스토리 기록
         PointHistory expectedHistory = new PointHistory(1L, userId, useAmount, TransactionType.USE, System.currentTimeMillis());
         when(pointHistoryTable.insert(eq(userId), eq(useAmount), eq(TransactionType.USE), anyLong()))
                 .thenReturn(expectedHistory);
@@ -361,6 +467,8 @@ class PointServiceTest {
         pointService.use(userId, useAmount);
 
         // then
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, times(1)).insertOrUpdate(userId, expectedBalance);
         verify(pointHistoryTable, times(1)).insert(eq(userId), eq(useAmount), eq(TransactionType.USE), anyLong());
     }
 
