@@ -10,6 +10,7 @@ public record UserPoint(
     public static final long MAX_CHARGE_AMOUNT = 50_000L;
     public static final long MIN_USE_AMOUNT = 100L;
     public static final long MAX_USE_AMOUNT = 50_000L;
+    public static final long DAILY_CHARGE_LIMIT = 100_000L;
 
     public static UserPoint empty(long id) {
         return new UserPoint(id, 0, System.currentTimeMillis());

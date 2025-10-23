@@ -102,6 +102,9 @@ class PointServiceTest {
         UserPoint currentPoint = UserPoint.empty(userId);
         when(userPointTable.selectById(userId)).thenReturn(currentPoint);
 
+        // Mock: 히스토리 조회 (일일 한도 검증용)
+        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(List.of());
+
         // Mock: 충전 후 반환값
         UserPoint chargedPoint = new UserPoint(userId, chargeAmount, System.currentTimeMillis());
         when(userPointTable.insertOrUpdate(userId, chargeAmount)).thenReturn(chargedPoint);
@@ -129,6 +132,9 @@ class PointServiceTest {
         // Mock: 초기 포인트 조회
         UserPoint currentPoint = new UserPoint(userId, initialAmount, System.currentTimeMillis());
         when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 히스토리 조회 (일일 한도 검증용)
+        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(List.of());
 
         // Mock: 충전 후 반환값
         UserPoint chargedPoint = new UserPoint(userId, expectedTotal, System.currentTimeMillis());
@@ -223,6 +229,9 @@ class PointServiceTest {
         UserPoint currentPoint = UserPoint.empty(userId);
         when(userPointTable.selectById(userId)).thenReturn(currentPoint);
 
+        // Mock: 히스토리 조회 (일일 한도 검증용)
+        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(List.of());
+
         // Mock: 충전 후 반환값
         UserPoint chargedPoint = new UserPoint(userId, minimumAmount, System.currentTimeMillis());
         when(userPointTable.insertOrUpdate(userId, minimumAmount)).thenReturn(chargedPoint);
@@ -256,6 +265,74 @@ class PointServiceTest {
 
         verify(userPointTable, times(1)).selectById(userId);
         verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("일일 충전 한도(100,000원)를 초과하면 예외가 발생한다")
+    void charge_exceedingDailyLimit_throwsException() {
+        // given
+        long userId = 1L;
+        long currentBalance = 50_000L;
+        long firstChargeToday = 60_000L;
+        long secondChargeAmount = 50_000L; // 이미 60,000원 충전 + 50,000원 = 110,000원 (한도 초과)
+
+        long now = System.currentTimeMillis();
+
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, now);
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 오늘 이미 60,000원 충전한 내역
+        List<PointHistory> todayHistories = List.of(
+                new PointHistory(1L, userId, firstChargeToday, TransactionType.CHARGE, now)
+        );
+        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(todayHistories);
+
+        // when & then
+        assertThrows(IllegalStateException.class, () -> {
+            pointService.charge(userId, secondChargeAmount);
+        });
+
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(pointHistoryTable, times(1)).selectAllByUserId(userId);
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("일일 충전 한도 내에서 여러 번 충전하면 성공한다")
+    void charge_withinDailyLimit_success() {
+        // given
+        long userId = 1L;
+        long firstChargeToday = 30_000L;
+        long secondChargeAmount = 40_000L; // 30,000 + 40,000 = 70,000 (한도 내)
+
+        long now = System.currentTimeMillis();
+
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, 30_000L, now);
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 오늘 이미 30,000원 충전한 내역
+        List<PointHistory> todayHistories = List.of(
+                new PointHistory(1L, userId, firstChargeToday, TransactionType.CHARGE, now)
+        );
+        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(todayHistories);
+
+        // Mock: 충전 후 반환값
+        long expectedBalance = 70_000L;
+        UserPoint chargedPoint = new UserPoint(userId, expectedBalance, now);
+        when(userPointTable.insertOrUpdate(userId, expectedBalance)).thenReturn(chargedPoint);
+
+        // when
+        UserPoint result = pointService.charge(userId, secondChargeAmount);
+
+        // then
+        assertNotNull(result);
+        assertEquals(userId, result.id());
+        assertEquals(expectedBalance, result.point());
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(pointHistoryTable, times(1)).selectAllByUserId(userId);
+        verify(userPointTable, times(1)).insertOrUpdate(userId, expectedBalance);
     }
 
     @Test
@@ -522,6 +599,9 @@ class PointServiceTest {
         // Mock: 초기 포인트 조회
         UserPoint currentPoint = UserPoint.empty(userId);
         when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 히스토리 조회 (일일 한도 검증용)
+        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(List.of());
 
         // Mock: 충전 후 반환값
         UserPoint chargedPoint = new UserPoint(userId, chargeAmount, System.currentTimeMillis());
