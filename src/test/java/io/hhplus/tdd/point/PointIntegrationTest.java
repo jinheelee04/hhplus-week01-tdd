@@ -407,4 +407,143 @@ class PointIntegrationTest {
                 .andExpect(jsonPath("$.id").value(userId))
                 .andExpect(jsonPath("$.point").value(0));
     }
+
+    @Test
+    @DisplayName("[GET /point/{id}/histories] 내역이 없는 사용자의 포인트 내역 조회 시 빈 리스트를 반환한다")
+    void getHistories_whenNoHistory_returnsEmptyList() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+
+        // when & then
+        mockMvc.perform(get("/point/{id}/histories", userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    @DisplayName("[GET /point/{id}/histories] 충전 내역이 조회된다")
+    void getHistories_withChargeHistory_returnsChargeHistory() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long chargeAmount = 10_000L;
+
+        // 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk());
+
+        // when & then
+        mockMvc.perform(get("/point/{id}/histories", userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].userId").value(userId))
+                .andExpect(jsonPath("$[0].amount").value(chargeAmount))
+                .andExpect(jsonPath("$[0].type").value("CHARGE"));
+    }
+
+    @Test
+    @DisplayName("[GET /point/{id}/histories] 사용 내역이 조회된다")
+    void getHistories_withUseHistory_returnsUseHistory() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long chargeAmount = 10_000L;
+        long useAmount = 3_000L;
+
+        // 충전 후 사용
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/point/{id}/use", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(useAmount)))
+                .andExpect(status().isOk());
+
+        // when & then
+        mockMvc.perform(get("/point/{id}/histories", userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].type").value("CHARGE"))
+                .andExpect(jsonPath("$[1].type").value("USE"));
+    }
+
+    @Test
+    @DisplayName("[GET /point/{id}/histories] 여러 번의 충전과 사용 내역이 모두 조회된다")
+    void getHistories_withMultipleTransactions_returnsAllHistories() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long firstCharge = 5_000L;
+        long secondCharge = 3_000L;
+        long firstUse = 2_000L;
+
+        // 충전 -> 충전 -> 사용
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(firstCharge)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(secondCharge)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/point/{id}/use", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(firstUse)))
+                .andExpect(status().isOk());
+
+        // when & then
+        mockMvc.perform(get("/point/{id}/histories", userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].userId").value(userId))
+                .andExpect(jsonPath("$[0].amount").value(firstCharge))
+                .andExpect(jsonPath("$[0].type").value("CHARGE"))
+                .andExpect(jsonPath("$[1].userId").value(userId))
+                .andExpect(jsonPath("$[1].amount").value(secondCharge))
+                .andExpect(jsonPath("$[1].type").value("CHARGE"))
+                .andExpect(jsonPath("$[2].userId").value(userId))
+                .andExpect(jsonPath("$[2].amount").value(firstUse))
+                .andExpect(jsonPath("$[2].type").value("USE"));
+    }
+
+    @Test
+    @DisplayName("[GET /point/{id}/histories] 특정 유저의 내역만 조회된다")
+    void getHistories_onlyReturnsOwnHistory() throws Exception {
+        // given
+        long user1 = System.currentTimeMillis();
+        long user2 = user1 + 1;
+        long chargeAmount = 5_000L;
+
+        // user1 충전
+        mockMvc.perform(patch("/point/{id}/charge", user1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk());
+
+        // user2 충전
+        mockMvc.perform(patch("/point/{id}/charge", user2)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk());
+
+        // when & then - user1 내역 조회
+        mockMvc.perform(get("/point/{id}/histories", user1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].userId").value(user1));
+
+        // when & then - user2 내역 조회
+        mockMvc.perform(get("/point/{id}/histories", user2))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].userId").value(user2));
+    }
 }
