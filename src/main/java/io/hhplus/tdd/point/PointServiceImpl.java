@@ -38,10 +38,10 @@ public class PointServiceImpl implements PointService {
         lock.lock();
         try {
             UserPoint current = getPoint(userId);
-            UserPoint updated = current.addPoints(chargeAmount);
 
             validateDailyChargeLimit(userId, chargeAmount);
 
+            UserPoint updated = current.addPoints(chargeAmount);
             UserPoint result = userPointTable.insertOrUpdate(updated.id(), updated.point());
             pointHistoryTable.insert(userId, chargeAmount, TransactionType.CHARGE, result.updateMillis());
 

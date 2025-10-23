@@ -105,7 +105,7 @@ class PointConcurrencyTest {
 
         // when
         for (int i = 0; i < userCount; i++) {
-            long userId = baseUserId + i;
+            final long userId = baseUserId + i;
             for (int j = 0; j < chargesPerUser; j++) {
                 executorService.submit(() -> {
                     try {
