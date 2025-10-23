@@ -231,4 +231,180 @@ class PointIntegrationTest {
                 .andExpect(jsonPath("$.code").exists())
                 .andExpect(jsonPath("$.message").exists());
     }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/use] 포인트 사용이 성공하면 차감된 포인트를 반환한다")
+    void use_withValidAmount_returnsDeductedPoint() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long chargeAmount = 10_000L;
+        long useAmount = 3_000L;
+        long expectedBalance = chargeAmount - useAmount;
+
+        // 먼저 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk());
+
+        // when & then
+        mockMvc.perform(patch("/point/{id}/use", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(useAmount)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId))
+                .andExpect(jsonPath("$.point").value(expectedBalance));
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/use] 여러 번 사용하면 포인트가 차감된다")
+    void use_multiple_deductsPoints() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long chargeAmount = 10_000L;
+        long firstUse = 3_000L;
+        long secondUse = 2_000L;
+        long expectedBalance = chargeAmount - firstUse - secondUse;
+
+        // 먼저 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk());
+
+        // when
+        mockMvc.perform(patch("/point/{id}/use", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(firstUse)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.point").value(chargeAmount - firstUse));
+
+        // then
+        mockMvc.perform(patch("/point/{id}/use", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(secondUse)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId))
+                .andExpect(jsonPath("$.point").value(expectedBalance));
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/use] 잔액보다 많은 금액을 사용하면 실패한다")
+    void use_exceedingBalance_fails() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long chargeAmount = 5_000L;
+        long useAmount = 10_000L;
+
+        // 먼저 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk());
+
+        // when & then
+        mockMvc.perform(patch("/point/{id}/use", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(useAmount)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").exists())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/use] 최소 사용 금액(100원) 미만으로 사용 시 실패한다")
+    void use_belowMinimum_fails() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long chargeAmount = 10_000L;
+        long belowMinimumAmount = 99L;
+
+        // 먼저 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk());
+
+        // when & then
+        mockMvc.perform(patch("/point/{id}/use", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(belowMinimumAmount)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").exists())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/use] 최소 사용 금액(100원)으로 사용이 성공한다")
+    void use_withMinimumAmount_succeeds() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long chargeAmount = 10_000L;
+        long minimumAmount = 100L;
+        long expectedBalance = chargeAmount - minimumAmount;
+
+        // 먼저 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk());
+
+        // when & then
+        mockMvc.perform(patch("/point/{id}/use", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(minimumAmount)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId))
+                .andExpect(jsonPath("$.point").value(expectedBalance));
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/use] 1회 최대 사용 금액(50,000원)을 초과하면 실패한다")
+    void use_exceedingMaxAmount_fails() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long chargeAmount = 100_000L;
+        long exceedingAmount = 50_001L;
+
+        // 먼저 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(50_000L)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(50_000L)))
+                .andExpect(status().isOk());
+
+        // when & then
+        mockMvc.perform(patch("/point/{id}/use", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(exceedingAmount)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").exists())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/use] 전체 잔액을 사용하면 0원이 된다")
+    void use_entireBalance_returnsZero() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long chargeAmount = 10_000L;
+
+        // 먼저 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk());
+
+        // when & then
+        mockMvc.perform(patch("/point/{id}/use", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId))
+                .andExpect(jsonPath("$.point").value(0));
+    }
 }
