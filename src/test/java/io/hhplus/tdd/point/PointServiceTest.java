@@ -447,6 +447,55 @@ class PointServiceTest {
     }
 
     @Test
+    @DisplayName("1회 최대 사용 금액(50,000원)을 초과하면 예외가 발생한다")
+    void use_exceedingMaxUseAmount_throwsException() {
+        // given
+        long userId = 1L;
+        long currentBalance = 100_000L;
+        long exceedingAmount = 50_001L;
+
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // when & then
+        assertThrows(IllegalArgumentException.class, () -> {
+            pointService.use(userId, exceedingAmount);
+        });
+
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("1회 최대 사용 금액(50,000원)으로 사용하면 성공한다")
+    void use_withMaximumAmount_success() {
+        // given
+        long userId = 1L;
+        long currentBalance = 100_000L;
+        long maximumAmount = 50_000L;
+        long expectedBalance = currentBalance - maximumAmount;
+
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 사용 후 반환값
+        UserPoint usedPoint = new UserPoint(userId, expectedBalance, System.currentTimeMillis());
+        when(userPointTable.insertOrUpdate(userId, expectedBalance)).thenReturn(usedPoint);
+
+        // when
+        UserPoint result = pointService.use(userId, maximumAmount);
+
+        // then
+        assertNotNull(result);
+        assertEquals(userId, result.id());
+        assertEquals(expectedBalance, result.point());
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, times(1)).insertOrUpdate(userId, expectedBalance);
+    }
+
+    @Test
     @DisplayName("내역이 없는 유저의 포인트 내역을 조회하면 빈 리스트를 반환한다")
     void getHistory_whenNoHistory_returnsEmptyList() {
         // given

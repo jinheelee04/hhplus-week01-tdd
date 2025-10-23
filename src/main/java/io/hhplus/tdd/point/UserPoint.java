@@ -9,6 +9,7 @@ public record UserPoint(
     public static final long MIN_CHARGE_AMOUNT = 100L;
     public static final long MAX_CHARGE_AMOUNT = 50_000L;
     public static final long MIN_USE_AMOUNT = 100L;
+    public static final long MAX_USE_AMOUNT = 50_000L;
 
     public static UserPoint empty(long id) {
         return new UserPoint(id, 0, System.currentTimeMillis());
@@ -41,6 +42,10 @@ public record UserPoint(
             throw new IllegalArgumentException(
                     "사용 금액은 최소 " + MIN_USE_AMOUNT + "원 이상이어야 합니다."
             );
+        }
+
+        if (amount > MAX_USE_AMOUNT) {
+            throw new IllegalArgumentException("1회 최대 사용 금액은 " + MAX_USE_AMOUNT + "원입니다");
         }
 
         if (this.point < amount) {
