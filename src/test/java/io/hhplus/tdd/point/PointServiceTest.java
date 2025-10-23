@@ -30,6 +30,22 @@ class PointServiceTest {
     void setUp() {
          pointService = new PointServiceImpl(userPointTable, pointHistoryTable);
     }
+
+    // 헬퍼 메서드: 빈 충전 히스토리 Mock 설정
+    private void mockEmptyChargeHistory(long userId) {
+        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(List.of());
+    }
+
+    // 헬퍼 메서드: 충전 성공 Mock 설정
+    private void mockChargeSuccess(long userId, long currentBalance, long expectedBalance) {
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        mockEmptyChargeHistory(userId);
+
+        UserPoint chargedPoint = new UserPoint(userId, expectedBalance, System.currentTimeMillis());
+        when(userPointTable.insertOrUpdate(userId, expectedBalance)).thenReturn(chargedPoint);
+    }
     @Test
     @DisplayName("존재하지 않는 유저의 포인트를 조회하면 0 포인트를 반환한다")
     void getPoint_whenUserNotExists_returnsZeroPoint() {
@@ -98,16 +114,7 @@ class PointServiceTest {
         long userId = 1L;
         long chargeAmount = 1000L;
 
-        // Mock: 초기 포인트 조회 (0원)
-        UserPoint currentPoint = UserPoint.empty(userId);
-        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
-
-        // Mock: 히스토리 조회 (일일 한도 검증용)
-        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(List.of());
-
-        // Mock: 충전 후 반환값
-        UserPoint chargedPoint = new UserPoint(userId, chargeAmount, System.currentTimeMillis());
-        when(userPointTable.insertOrUpdate(userId, chargeAmount)).thenReturn(chargedPoint);
+        mockChargeSuccess(userId, 0L, chargeAmount);
 
         // when
         UserPoint result = pointService.charge(userId, chargeAmount);
@@ -129,16 +136,7 @@ class PointServiceTest {
         long chargeAmount = 500L;
         long expectedTotal = initialAmount + chargeAmount;
 
-        // Mock: 초기 포인트 조회
-        UserPoint currentPoint = new UserPoint(userId, initialAmount, System.currentTimeMillis());
-        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
-
-        // Mock: 히스토리 조회 (일일 한도 검증용)
-        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(List.of());
-
-        // Mock: 충전 후 반환값
-        UserPoint chargedPoint = new UserPoint(userId, expectedTotal, System.currentTimeMillis());
-        when(userPointTable.insertOrUpdate(userId, expectedTotal)).thenReturn(chargedPoint);
+        mockChargeSuccess(userId, initialAmount, expectedTotal);
 
         // when
         UserPoint result = pointService.charge(userId, chargeAmount);
@@ -225,16 +223,7 @@ class PointServiceTest {
         long userId = 1L;
         long minimumAmount = 100L;
 
-        // Mock: 초기 포인트 조회
-        UserPoint currentPoint = UserPoint.empty(userId);
-        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
-
-        // Mock: 히스토리 조회 (일일 한도 검증용)
-        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(List.of());
-
-        // Mock: 충전 후 반환값
-        UserPoint chargedPoint = new UserPoint(userId, minimumAmount, System.currentTimeMillis());
-        when(userPointTable.insertOrUpdate(userId, minimumAmount)).thenReturn(chargedPoint);
+        mockChargeSuccess(userId, 0L, minimumAmount);
 
         // when
         UserPoint result = pointService.charge(userId, minimumAmount);
@@ -596,16 +585,7 @@ class PointServiceTest {
         long userId = 1L;
         long chargeAmount = 1000L;
 
-        // Mock: 초기 포인트 조회
-        UserPoint currentPoint = UserPoint.empty(userId);
-        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
-
-        // Mock: 히스토리 조회 (일일 한도 검증용)
-        when(pointHistoryTable.selectAllByUserId(userId)).thenReturn(List.of());
-
-        // Mock: 충전 후 반환값
-        UserPoint chargedPoint = new UserPoint(userId, chargeAmount, System.currentTimeMillis());
-        when(userPointTable.insertOrUpdate(userId, chargeAmount)).thenReturn(chargedPoint);
+        mockChargeSuccess(userId, 0L, chargeAmount);
 
         // Mock: 히스토리 기록
         PointHistory expectedHistory = new PointHistory(1L, userId, chargeAmount, TransactionType.CHARGE, System.currentTimeMillis());
