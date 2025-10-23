@@ -396,6 +396,56 @@ class PointServiceTest {
         verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
     }
 
+
+    @Test
+    @DisplayName("최소 사용 금액(100원) 미만으로 사용하면 예외가 발생한다")
+    void use_belowMinimumAmount_throwsException() {
+        // given
+        long userId = 1L;
+        long currentBalance = 10_000L;
+        long belowMinimumAmount = 99L;
+
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // when & then
+        assertThrows(IllegalArgumentException.class, () -> {
+            pointService.use(userId, belowMinimumAmount);
+        });
+
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("최소 사용 금액(100원)으로 사용하면 성공한다")
+    void use_withMinimumAmount_success() {
+        // given
+        long userId = 1L;
+        long currentBalance = 10_000L;
+        long minimumAmount = 100L;
+        long expectedBalance = currentBalance - minimumAmount;
+
+        // Mock: 현재 포인트 조회
+        UserPoint currentPoint = new UserPoint(userId, currentBalance, System.currentTimeMillis());
+        when(userPointTable.selectById(userId)).thenReturn(currentPoint);
+
+        // Mock: 사용 후 반환값
+        UserPoint usedPoint = new UserPoint(userId, expectedBalance, System.currentTimeMillis());
+        when(userPointTable.insertOrUpdate(userId, expectedBalance)).thenReturn(usedPoint);
+
+        // when
+        UserPoint result = pointService.use(userId, minimumAmount);
+
+        // then
+        assertNotNull(result);
+        assertEquals(userId, result.id());
+        assertEquals(expectedBalance, result.point());
+        verify(userPointTable, times(1)).selectById(userId);
+        verify(userPointTable, times(1)).insertOrUpdate(userId, expectedBalance);
+    }
+
     @Test
     @DisplayName("내역이 없는 유저의 포인트 내역을 조회하면 빈 리스트를 반환한다")
     void getHistory_whenNoHistory_returnsEmptyList() {
