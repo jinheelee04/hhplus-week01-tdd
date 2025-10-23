@@ -82,4 +82,153 @@ class PointIntegrationTest {
                 .andExpect(jsonPath("$.id").value(userId))
                 .andExpect(jsonPath("$.point").value(expectedTotal));
     }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/charge] 포인트 충전이 성공하면 충전된 포인트를 반환한다")
+    void charge_withValidAmount_returnsChargedPoint() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long chargeAmount = 10_000L;
+
+        // when & then
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(chargeAmount)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId))
+                .andExpect(jsonPath("$.point").value(chargeAmount));
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/charge] 여러 번 충전하면 포인트가 누적된다")
+    void charge_multiple_accumulatesPoints() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long firstCharge = 5_000L;
+        long secondCharge = 3_000L;
+        long expectedTotal = firstCharge + secondCharge;
+
+        // when
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(firstCharge)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.point").value(firstCharge));
+
+        // then
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(secondCharge)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId))
+                .andExpect(jsonPath("$.point").value(expectedTotal));
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/charge] 최소 충전 금액(100원) 미만으로 충전 시 실패한다")
+    void charge_belowMinimum_fails() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long belowMinimumAmount = 99L;
+
+        // when & then
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(belowMinimumAmount)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").exists())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/charge] 최소 충전 금액(100원)으로 충전이 성공한다")
+    void charge_withMinimumAmount_succeeds() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long minimumAmount = 100L;
+
+        // when & then
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(minimumAmount)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId))
+                .andExpect(jsonPath("$.point").value(minimumAmount));
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/charge] 1회 최대 충전 금액(50,000원)을 초과하면 실패한다")
+    void charge_exceedingMaxAmount_fails() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long exceedingAmount = 50_001L;
+
+        // when & then
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(exceedingAmount)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").exists())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/charge] 최대 잔액(100,000원)을 초과하면 실패한다")
+    void charge_exceedingMaxBalance_fails() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long firstCharge = 50_000L;  // 1회 최대 충전 금액
+        long secondCharge = 45_000L; // 50,000 + 45,000 = 95,000
+        long thirdCharge = 10_000L;  // 95,000 + 10,000 = 105,000 (최대 잔액 초과)
+
+        // 50,000원 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(firstCharge)))
+                .andExpect(status().isOk());
+
+        // 45,000원 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(secondCharge)))
+                .andExpect(status().isOk());
+
+        // when & then - 10,000원 추가 충전 시 최대 잔액 초과로 실패
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(thirdCharge)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").exists())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/charge] 일일 충전 한도(100,000원)를 초과하면 실패한다")
+    void charge_exceedingDailyLimit_fails() throws Exception {
+        // given
+        long userId = System.currentTimeMillis();
+        long firstCharge = 50_000L;   // 1회 최대 금액
+        long secondCharge = 40_000L;  // 50,000 + 40,000 = 90,000
+        long thirdCharge = 15_000L;   // 90,000 + 15,000 = 105,000 (일일 한도 100,000 초과)
+
+        // 50,000원 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(firstCharge)))
+                .andExpect(status().isOk());
+
+        // 40,000원 충전
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(secondCharge)))
+                .andExpect(status().isOk());
+
+        // when & then - 15,000원 추가 충전 시 일일 한도 초과로 실패
+        mockMvc.perform(patch("/point/{id}/charge", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.valueOf(thirdCharge)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").exists())
+                .andExpect(jsonPath("$.message").exists());
+    }
 }
